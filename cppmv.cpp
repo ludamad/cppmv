@@ -53,6 +53,9 @@ struct Path {
 			components.push_back(copy_until(p, '/', &p));
 		}
 	}
+	bool operator=(const Path& o) const {
+		return dotdots == o.dotdots && components == o.components;
+	}
 	bool operator<(const Path& o) const {
 		if (dotdots != o.dotdots) {
 			return dotdots > o.dotdots;
@@ -88,7 +91,36 @@ struct Path {
 		}
 		return ret;
 	}
-//	void move_to()
+	//from abs to rel
+	Path relpath_to(const Path& p) const {
+		std::string filename = p.components.back();
+		int nparts = components.size() - 1;
+		int oparts = p.components.size() - 1;
+		Path relpath;
+		int i;
+		for (i = 0; i < nparts && i < oparts; i++) {
+			if (p.components[i] != components[i])
+				break;
+		}
+		relpath.dotdots = nparts - i;
+		for (; i < oparts; i++) {
+			relpath.components.push_back(p.components[i]);
+		}
+		relpath.components.push_back(filename);
+		return relpath;
+	}
+	//from rel to abs
+	Path absolute_path(const Path& base) const {
+		int bparts = base.components.size() - 1 - dotdots;
+		Path relpath;
+		for (int i = 0; i < bparts; i++) {
+			relpath.components.push_back(base.components[i]);
+		}
+		for (int i = 0; i < components.size(); i++) {
+			relpath.components.push_back(components[i]);
+		}
+		return relpath;
+	}
 };
 
 struct Include {
@@ -108,15 +140,14 @@ static void consume_file(FileBuffer& file, const char* fname) {
 	Include inc;
 	std::fstream f(fname, std::ios_base::in);
 
-	std::string inccont;
+	std::string inccont, line;
 	const char* content;
 	int lineno = 0;
-	char buff[255];
 
 	while (!f.eof()) {
-		f.getline(buff, 255);
-		file.lines.push_back(buff);
-		if (starts_with(buff, "#include \"", &content)) {
+		std::getline(f, line);
+		file.lines.push_back(line);
+		if (starts_with(line.c_str(), "#include \"", &content)) {
 			inccont = copy_until(content, '"');
 			inc.includepath = Path(inccont.c_str());
 			inc.lineno = lineno;
@@ -127,7 +158,34 @@ static void consume_file(FileBuffer& file, const char* fname) {
 	f.close();
 }
 
-static void update_includes(FileBuffer& file) {
+static void update_refs_for_self_move(FileBuffer& file, const char* src,
+		const char* dst) {
+	Path p1(src), p2(dst);
+	for (int i = 0; i < file.includes.size(); i++) {
+		Path& incpath = file.includes[i].includepath;
+		Path abspath = incpath.absolute_path(p1);
+		incpath = p2.relpath_to(abspath);
+	}
+}
+static void update_refs_for_ref_move(FileBuffer& file, const char* thisfile,
+		const char** argv, int argc) {
+	Path p(thisfile);
+	std::vector<std::pair<Path, Path> > pathpairs;
+	for (int i = 0; i < argc; i += 2) {
+		Path p1(argv[i]), p2(argv[i + 1]);
+		pathpairs.push_back(
+				std::pair<Path, Path>(p1.absolute_path(p),
+						p2.absolute_path(p)));
+	}
+	for (int i = 0; i < file.includes.size(); i++) {
+		Path& incpath = file.includes[i].includepath;
+		Path abspath = incpath.absolute_path(p);
+		for (int j = 0; j < pathpairs.size(); j++) {
+		}
+	}
+}
+
+static void sort_includes(FileBuffer& file) {
 	std::vector<int> linenos;
 	for (int i = 0; i < file.includes.size(); i++) {
 		linenos.push_back(file.includes[i].lineno);
@@ -158,30 +216,24 @@ static void update_file(FileBuffer& file, const char* fname) {
 }
 
 const char* USAGE =
-		"Usage: --refs <file to update> <file1 old> <file1 new> ... <filen old> <filen new>\n"
-				"Usage: --mv <file old> <file new>\n";
-
+		"Usage: <file old> <file new> <ref old> <ref new> ... <ref old> <ref new>\n";
 int main(int argc, const char** argv) {
-	bool include_update = false;
-	bool header_update = false;
-
-	if (argc >= 5 && strcmp(argv[1], "--refs") == 0) {
-		include_update = true;
-	}
-	if (argc >= 4 && strcmp(argv[1], "--mv") == 0) {
-		header_update = true;
-	}
-
-	if (!include_update && !header_update) {
+	if (argc < 3 || (argc % 2) != 1) {
 		printf(USAGE);
 		return 0;
 	}
-	const char* fname1 = argv[2];
-	const char* fname2 = argv[3];
+
 	FileBuffer file;
-	consume_file(file, fname1);
-	update_includes(file);
-	update_file(file, fname2);
+	const char* src = argv[1], *dst = argv[2];
+
+	consume_file(file, src);
+
+	update_refs_for_self_move(file, src, dst);
+	update_refs_for_ref_move(file, dst, argv + 5, argc - 5);
+
+	sort_includes(file);
+
+	update_file(file, dst);
 
 	return 0;
 }
