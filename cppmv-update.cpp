@@ -163,6 +163,9 @@ static void consume_file(FileBuffer& file, const char* fname) {
 
 	while (!f.eof()) {
 		std::getline(f, line);
+		if (f.eof() && line.empty()) {
+			break; // Ensure we do not duplicate newline
+		}
 		file.lines.push_back(line);
 		if (starts_with(line.c_str(), "#include \"", &content)) {
 			inccont = copy_until(content, '"', &content);
