@@ -17,39 +17,31 @@ fi
 updateargs=""
 allfiles=$(find . -regex '.*\.\(c\|cpp\|h\)$' -print)
 
-
-
 if [ -d $src ]; then
-	if [ ! -e $dst ] ; then mkdir -p $dst fi
 
 	pushd $src > /dev/null
 	movingfiles=$(find . -regex '.*\.\(c\|cpp\|h\)$' -print)
 	popd > /dev/null
 
 	for file in $movingfiles ; do
-		sf=$src/${file:2} # strip ./ from start
 		df=$dst/${file:2}
-		updateargs+="$sf $df "
+		if [ -e $df ]; then echo "$df already exists, aborting."; exit -1; fi
+	done
+
+	cp -r $src $dst #hack to make sure necessary folders exist
 	
-		if [ -e "$df" ]; then
-			echo "$df already exists, aborting."	
-			exit -1
-		fi
+	for file in $movingfiles ; do
+		updateargs+="$src/${file:2} $dst/${file:2} " # strip ./'s from start
 	done
 
 	for file in $movingfiles ; do
-		sf=$src/${file:2} # strip ./ from start
-		df=$dst/${file:2}
-		if ! $DIR/cppmv-update $sf $df $updateargs ; then
-			echo "Error in movement of $sf to $df - source files remain unchanged."	
-			exit -1
+		if ! $DIR/cppmv-update $src/${file:2} $dst/${file:2} $updateargs ; then
+			echo "Error in movement of $sf to $df - source files remain unchanged."; exit -1
 		fi
 	done
 
-	for file in $movingfiles ; do
-		rm $src/${file:2} # strip ./ from start
-	done
-
+	for file in $movingfiles ; do rm $src/${file:2} ; done
+	rm -r $src
 else #Hack it to make it look like a dir with just our $src file in it
 	updateargs="$src $dst"
 	if [ -e "$dst" ]; then

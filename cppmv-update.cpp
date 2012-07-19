@@ -127,6 +127,7 @@ struct Path {
 struct Include {
 	Path includepath;
 	int lineno;
+	std::string restofline;
 	bool operator<(const Include& o) const {
 		return includepath < o.includepath;
 	}
@@ -154,7 +155,8 @@ static void consume_file(FileBuffer& file, const char* fname) {
 		std::getline(f, line);
 		file.lines.push_back(line);
 		if (starts_with(line.c_str(), "#include \"", &content)) {
-			inccont = copy_until(content, '"');
+			inccont = copy_until(content, '"', &content);
+			inc.restofline = content;
 			inc.includepath = Path(inccont.c_str());
 			inc.lineno = lineno;
 			file.includes.push_back(inc);
@@ -218,7 +220,7 @@ static void update_file(FileBuffer& file, const char* fname) {
 		for (int z = 0; z < file.includes.size(); z++) {
 			if (i == file.includes[z].lineno) {
 				line = "#include \"" + file.includes[z].includepath.to_string()
-						+ "\"";
+						+ "\"" + file.includes[z].restofline;
 				break;
 			}
 		}
