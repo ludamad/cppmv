@@ -12,11 +12,13 @@
 using namespace std;
 
 static bool starts_with(const char* line, const char* prefix,
-		const char** content) {
+		const char** content = NULL) {
 	int length = strlen(prefix);
 	bool hasprefix = strncmp(line, prefix, length) == 0;
 	if (hasprefix) {
-		*content = line + length;
+		if (content) {
+			*content = line + length;
+		}
 		return true;
 	}
 	return false;
@@ -35,6 +37,13 @@ static std::string copy_until(const char* line, char c,
 	return ret;
 }
 
+static void trim_space_at_end(std::string& str) {
+	int i = str.length();
+	while (i > 0 && isspace(str[i - 1])) {
+		i--;
+	}
+	str.resize(i);
+}
 struct Path {
 	int dotdots;
 	std::vector<std::string> components;
@@ -53,6 +62,7 @@ struct Path {
 			//Will copy to end for last string
 			components.push_back(copy_until(p, '/', &p));
 		}
+		trim_space_at_end(components.back());
 	}
 	bool operator==(const Path& o) const {
 		return dotdots == o.dotdots && components == o.components;
@@ -166,6 +176,42 @@ static void consume_file(FileBuffer& file, const char* fname) {
 	f.close();
 }
 
+static void trimspaces(std::string& arg, int& s, int& e) {
+	for (s = 0; s < arg.size() && isspace(arg[s]); s++) {
+	}
+	for (e = arg.size(); e > s && isspace(arg[e - 1]); e--) {
+	}
+}
+
+static void update_cmakerefs_for_ref_move(FileBuffer& file,
+		const char* thisfile, const char** argv, int argc) {
+	Path p(thisfile);
+	std::vector<std::pair<Path, Path> > pathpairs;
+	for (int i = 0; i < argc; i += 2) {
+		Path p1(argv[i]), p2(argv[i + 1]);
+		pathpairs.push_back(std::pair<Path, Path>(p1, p2));
+	}
+	for (int i = 0; i < file.lines.size(); i++) {
+		std::string& line = file.lines[i];
+
+		int s, e;
+		trimspaces(line, s, e);
+		if (s == e) {
+			continue;
+		}
+		Path path(line.c_str() + s);
+		for (int j = 0; j < pathpairs.size(); j++) {
+//			std::cout << path.to_string() << " vs "
+//					<< pathpairs[j].first.to_string() << std::endl;
+			if (path == pathpairs[j].first) {
+				Path opath = pathpairs[j].second;
+				line.replace(line.begin() + s, line.begin() + e,
+						opath.to_string());
+				break;
+			}
+		}
+	}
+}
 static void update_refs_for_self_move(FileBuffer& file, const char* src,
 		const char* dst) {
 	Path p1(src), p2(dst);
@@ -191,6 +237,7 @@ static void update_refs_for_ref_move(FileBuffer& file, const char* thisfile,
 //					<< pathpairs[j].first.to_string() << std::endl;
 			if (abspath == pathpairs[j].first) {
 				incpath = p.relpath_to(pathpairs[j].second);
+				break;
 			}
 		}
 	}
@@ -231,25 +278,58 @@ static void update_file(FileBuffer& file, const char* fname) {
 }
 
 const char* USAGE =
-		"Usage: <file old> <file new> <ref old> <ref new> ... <ref old> <ref new>\n";
+		"Usage: [--sort --cmake] <file old> <file new> <ref old> <ref new> ... <ref old> <ref new>\n";
 int main(int argc, const char** argv) {
-	if (argc < 3 || (argc % 2) != 1) {
+	bool sort = false, cmake = false, self_write_only = false;
+//	for (int i = 0; i < argc; i++) {
+//		printf("Arg %d: %s\n", i, argv[i]);
+//	}
+
+	int options;
+	for (options = 1; options < argc; options++) {
+		const char* arg = argv[options];
+		if (!starts_with(arg, "--")) {
+			break;
+		}
+		if (strcmp(arg, "--help") == 0) {
+			printf(USAGE);
+			return 0;
+		} else if (strcmp(arg, "--sort") == 0) {
+			sort = true;
+		} else if (strcmp(arg, "--cmake") == 0) {
+			cmake = true;
+		} else if (strcmp(arg, "--self-write-only") == 0) {
+			self_write_only = true;
+		} else {
+			printf("Invalid option '%s', aborting \n", arg);
+			exit(1);
+		}
+	}
+	const char** restargv = argv + options;
+	int restargc = argc - options;
+
+	if (restargc < 2 || (restargc % 2) != 0) {
 		printf(USAGE);
 		return 0;
 	}
 
-	FileBuffer file;
-	const char* src = argv[1], *dst = argv[2];
+	const char* src = restargv[0], *dst = restargv[1];
 
+	FileBuffer file;
 	consume_file(file, src);
 
-	update_refs_for_self_move(file, src, dst);
-	update_refs_for_ref_move(file, dst, argv + 3, argc - 3);
+	if (cmake) {
+		update_cmakerefs_for_ref_move(file, dst, restargv + 2, restargc - 2);
+	} else {
+		update_refs_for_self_move(file, src, dst);
+		update_refs_for_ref_move(file, dst, restargv + 2, restargc - 2);
 
-	sort_includes(file);
+		if (sort) {
+			sort_includes(file);
+		}
+	}
 
-	update_file(file, dst);
+	update_file(file, self_write_only ? src : dst);
 
 	return 0;
 }
-
