@@ -77,7 +77,7 @@ else #Hack it to make it look like a dir with just our $src file in it
 		exit -1
 	elif ! $cppmvupdate $flags $src $dst $updateargs ; then
 		if ! $gitmv ; then echo "Error in movement of $sf to $df - source files remain unchanged."; 
-		else echo "Error in processing of $sf to $df - source files may have been changed, git revert recommended."; fi
+		else echo "Error in processing of $sf to $df - source files may have been changed, 'git reset HEAD' recommended."; fi
 		exit -1
 	fi
 	if $gitmv ; then git mv $src $dst; else rm $src; fi
