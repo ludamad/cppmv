@@ -1,5 +1,5 @@
 //============================================================================
-// Usage: <file to update> <file1> <file1 new location> ... <filen> <filen new location>
+// Usage: <src> <dst> <updated src 1> <updated dst 1> ... etc
 //============================================================================
 
 #include <algorithm>
@@ -45,6 +45,7 @@ struct Path {
 	Path(const char* path) :
 			dotdots(0) {
 		const char* p = path;
+		starts_with(p, "./", &p); //skip ./ at start
 		while (starts_with(p, "../", &p)) {
 			dotdots++;
 		}
@@ -53,7 +54,7 @@ struct Path {
 			components.push_back(copy_until(p, '/', &p));
 		}
 	}
-	bool operator=(const Path& o) const {
+	bool operator==(const Path& o) const {
 		return dotdots == o.dotdots && components == o.components;
 	}
 	bool operator<(const Path& o) const {
@@ -140,6 +141,11 @@ static void consume_file(FileBuffer& file, const char* fname) {
 	Include inc;
 	std::fstream f(fname, std::ios_base::in);
 
+	if (!f) {
+		printf("Source file '%s' does not exist!\n", fname);
+		exit(-1);
+	}
+
 	std::string inccont, line;
 	const char* content;
 	int lineno = 0;
@@ -173,14 +179,17 @@ static void update_refs_for_ref_move(FileBuffer& file, const char* thisfile,
 	std::vector<std::pair<Path, Path> > pathpairs;
 	for (int i = 0; i < argc; i += 2) {
 		Path p1(argv[i]), p2(argv[i + 1]);
-		pathpairs.push_back(
-				std::pair<Path, Path>(p1.absolute_path(p),
-						p2.absolute_path(p)));
+		pathpairs.push_back(std::pair<Path, Path>(p1, p2));
 	}
 	for (int i = 0; i < file.includes.size(); i++) {
 		Path& incpath = file.includes[i].includepath;
 		Path abspath = incpath.absolute_path(p);
 		for (int j = 0; j < pathpairs.size(); j++) {
+//			std::cout << abspath.to_string() << " VS "
+//					<< pathpairs[j].first.to_string() << std::endl;
+			if (abspath == pathpairs[j].first) {
+				incpath = p.relpath_to(pathpairs[j].second);
+			}
 		}
 	}
 }
@@ -199,6 +208,10 @@ static void sort_includes(FileBuffer& file) {
 
 static void update_file(FileBuffer& file, const char* fname) {
 	std::fstream f(fname, std::ios_base::out);
+	if (!f) {
+		printf("Error creating destination file %s!\n", fname);
+		exit(-1);
+	}
 
 	for (int i = 0; i < file.lines.size(); i++) {
 		std::string line = file.lines[i];
@@ -229,7 +242,7 @@ int main(int argc, const char** argv) {
 	consume_file(file, src);
 
 	update_refs_for_self_move(file, src, dst);
-	update_refs_for_ref_move(file, dst, argv + 5, argc - 5);
+	update_refs_for_ref_move(file, dst, argv + 3, argc - 3);
 
 	sort_includes(file);
 
@@ -237,3 +250,4 @@ int main(int argc, const char** argv) {
 
 	return 0;
 }
+
