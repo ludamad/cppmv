@@ -65,11 +65,12 @@ if [ -d $src ]; then
 	done
 
 	if $gitmv ; then
-		git mv $src $dst 
+		if [ ! -e $dst ]; then mkdir -p $dst ; fi
+		if ! git mv $src/* $dst ; then exit 1 ; fi
 	else
 		for file in $movingfiles ; do rm $src/${file:2} ; done
-		rm -r $src
 	fi
+	rm -r $src
 else #Hack it to make it look like a dir with just our $src file in it
 	updateargs="$src $dst"
 	if [ -e "$dst" ]; then
