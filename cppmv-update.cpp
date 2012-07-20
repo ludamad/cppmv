@@ -223,15 +223,8 @@ static void update_refs_for_self_move(FileBuffer& file, const char* src,
 	Path p1(src), p2(dst);
 	for (int i = 0; i < file.includes.size(); i++) {
 		Path& incpath = file.includes[i].includepath;
-		std::cout << "-----------------" << std::endl;
-		std::cout << "SRC: " << src << std::endl;
-		std::cout << "DST: " << p2.to_string() << std::endl;
-		std::cout << "OLDINC: " << incpath.to_string() << std::endl;
 		Path abspath = incpath.absolute_path(p1);
 		incpath = p2.relpath_to(abspath);
-
-		std::cout << "NEWINC: " << incpath.to_string() << std::endl;
-		std::cout << "ABS: " << abspath.to_string() << std::endl;
 	}
 }
 static void update_refs_for_ref_move(FileBuffer& file, const char* thisfile,
