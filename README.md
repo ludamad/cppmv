@@ -12,8 +12,10 @@ Does not currently abitrary amount of pairs of src, dst arguments (can be done w
 Does not at this moment support directories with spaces in them due to the bash wrapper implementation.
 
 --git: use git mv so files remain tracked nicely
+
 --cmake: update CMakeLists.txt if present, makes a rather naive assumption that all source files are somewhere in file, one line per file.
 The CMakeLists.txt file must be in the current working folder.
+
 --sort: Sort includes alphabetically and from least-nested to most-nested. Does not attempt to group them nicely at this time, simply swapping their locations.
 
 The tool is implemented as a bash script over a small C++-programmed utility.
