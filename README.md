@@ -35,12 +35,14 @@ cppmv must be in the same directory as an executable called cppmv-update (create
 Examples:
 
 cppmv src/a.h src/b.h
+
 Effect: rename the file and update all includes that reference a.h
 
 cppmv src/a.cpp src/foo/a.cpp
+
 Effect: move the file and update all includes in a.cpp to work with the new location
 
-cppmv works only with full paths (you cannot do src/a.h src/foo/ in the previous example).
+cppmv can move whole folders, but does not implicitly move files into folders (you cannot do src/a.h src/foo/ in the previous example).
 
 
 Assumptions:
