@@ -46,7 +46,7 @@ cppmv works only with full paths (you cannot do src/a.h src/foo/ in the previous
 Assumptions:
 =====
 
-cppmv assumes includes of the form #include <myfile.h> are from external libraries and will not update them.
+cppmv assumes includes of the form #include <myfile.h> (angle brackets) are from external libraries and will not update them.
 cppmv assumes includes of the form #include "myfile.h" are relative paths and will update them globally.
 
 cppmv will read in its file in its entirety and then write back the file, and it may take a bit of time. I advise only using this tool if your source is under version control, and using the source controls diff tool to ensure that the changes are correct.
