@@ -1,3 +1,5 @@
+EDIT: This is old and a curiousity. Please just use a good IDE that resolves moves and/or a sane include strategy with absolute paths so you can do a consistent rename
+
 cppmv
 =====
 
